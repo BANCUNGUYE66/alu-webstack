@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# This script retrieves DNS information (A record and destination IP) for specified subdomains.
+# Note: SC2086 is ignored as requested.
+
+# Function to perform the DNS lookup and format the output
+get_dns_info() {
+    # $1: subdomain name (e.g., www)
+    # $2: domain name (e.g., holberton.online)
+    
+    local full_domain="${1}.${2}"
+    local subdomain="$1"
+    
+    # Use dig to query the domain and pipe to grep/awk
+    # grep -A1 'ANSWER SECTION:' ensures we get the relevant line and one line after
+    # awk extracts the fields: $5=RECORD_TYPE (IN A) and $6=DESTINATION (IP)
+    dig "$full_domain" | awk '/ANSWER SECTION:/{getline; print}' | \
+    awk -v sub="$subdomain" '{
+        # The record type is the 5th field, the destination is the 6th field
+        if ($5 == "A") {
+            # Print in the required format: The subdomain [SUB] is a [TYPE] record and points to [DEST]
+            printf "The subdomain %s is a %s record and points to %s\n", sub, $5, $6
+        }
+    }'
+}
+
+# --- Main Script Execution ---
+
+# Check if the domain argument is provided
+if [ -z "$1" ]; then
+    echo "Usage: $0 domain [subdomain]"
+    exit 1
+fi
+
+DOMAIN="$1"
+SUBDOMAIN="$2"
+
+# Case 1: Specific subdomain provided
+if [ -n "$SUBDOMAIN" ]; then
+    get_dns_info "$SUBDOMAIN" "$DOMAIN"
+
+# Case 2: Only domain provided (check the four required subdomains)
+else
+    # Define the required subdomains in the required order
+    SUBDOMAINS=("www" "lb-01" "web-01" "web-02")
+    
+    for sub in "${SUBDOMAINS[@]}"; do
+        get_dns_info "$sub" "$DOMAIN"
+    done
+fi
